@@ -1,49 +1,56 @@
 # Workout Tracking API
 
-A Flask backend API for a workout tracking application used by personal trainers. It tracks workouts and the exercises in them. Each workout can include several exercises, and each one records sets, reps or duration. Exercises are reusable, so a trainer can add the same exercise to many workouts.
+A Flask REST API for a workout tracking application used by personal trainers. Trainers can create workouts and a library of reusable exercises, then add exercises to workouts with the sets, reps or duration for each one.
 
-Built with **Flask**, **SQLAlchemy** and **Marshmallow**. It uses validations at three levels: table constraints, model validations and schema validations.
+Built with **Flask**, **Flask-SQLAlchemy**, **Flask-Migrate** and **Marshmallow**. Data is validated at three levels: database table constraints, SQLAlchemy model validations and Marshmallow schema validations.
 
 ---
 
-## Tech Stack & Packages
+## Packages
 
-| Package | Purpose |
-|---|---|
-| `flask` | Web framework / routing |
-| `flask-sqlalchemy` | ORM integration with Flask |
-| `flask-migrate` | Database migrations (Alembic) |
-| `marshmallow` | Serialization, deserialization and schema validation |
-| `sqlalchemy` | Installed with flask-sqlalchemy; used for `validates` and constraints |
-| `alembic` | Installed with flask-migrate |
+| Package | Version | Purpose |
+|---|---|---|
+| `flask` | 3.1 | Web framework and routing |
+| `flask-sqlalchemy` | 3.1 | SQLAlchemy ORM integration |
+| `flask-migrate` | 4.1 | Database migrations (Alembic) |
+| `marshmallow` | 4.3 | Serialization, deserialization and schema validation |
+| `sqlalchemy` | 2.1 | Installed with flask-sqlalchemy |
+| `alembic` | 1.20 | Installed with flask-migrate |
 
-Python version: **3.8+** (managed with `pipenv`)
+Requires **Python 3.12** and **pipenv**. Exact versions are pinned in `Pipfile.lock`.
 
-### Pipfile
+---
 
-```toml
-[[source]]
-url = "https://pypi.org/simple"
-verify_ssl = true
-name = "pypi"
-
-[packages]
-flask = "*"
-flask-sqlalchemy = "*"
-flask-migrate = "*"
-marshmallow = "*"
-
-[dev-packages]
-
-[requires]
-python_version = "3.8"
-```
-
-### Install the packages
+## Installation
 
 ```bash
-pipenv install flask flask-sqlalchemy flask-migrate marshmallow
-pipenv shell
+git clone <your-repo-url>
+cd workout-application
+
+pipenv install      # installs the packages from Pipfile.lock
+pipenv shell        # activates the virtual environment
+```
+
+## Running the app
+
+All commands run from the `server/` directory:
+
+```bash
+cd server
+export FLASK_APP=app.py
+
+flask db upgrade head   # create the tables in server/instance/app.db
+python seed.py          # reset the tables and add sample data
+python app.py           # start the API at http://localhost:5555
+```
+
+Run `python seed.py` again at any time to reset the data. To explore the models interactively, use `flask shell`.
+
+If you change a model, create and apply a new migration:
+
+```bash
+flask db migrate -m "describe the change"
+flask db upgrade head
 ```
 
 ---
@@ -52,217 +59,120 @@ pipenv shell
 
 ```
 workout-application/
-├── Pipfile
-├── Pipfile.lock
+├── Pipfile / Pipfile.lock
 ├── README.md
-├── .gitignore          # Python template
 └── server/
-    ├── app.py          # Flask app, config, routes
-    ├── models.py       # SQLAlchemy models, constraints, validations
-    ├── schemas.py      # Marshmallow schemas (optional: can live in models.py)
-    ├── seed.py         # Resets and seeds the database
-    ├── app.db          # SQLite database (generated)
-    └── migrations/     # Flask-Migrate files (generated)
-```
-
----
-
-## Setup & Running
-
-```bash
-# 1. Install dependencies
-pipenv install
-pipenv shell
-
-# 2. Move into the server directory
-cd server
-
-# 3. Initialize and run migrations
-export FLASK_APP=app.py
-flask db init
-flask db migrate -m "create exercises, workouts, workout_exercises tables"
-flask db upgrade head
-
-# 4. Seed the database
-python seed.py
-
-# 5. Run the server (http://localhost:5555)
-python app.py
-```
-
-To check relationships and validations by hand:
-
-```bash
-flask shell
+    ├── app.py              # App setup: config, database, routes and error handlers
+    ├── models.py           # Models, relationships, table constraints, model validations
+    ├── schemas.py          # Marshmallow schemas and schema validations
+    ├── errors.py           # JSON error handlers (400 / 404 / 409)
+    ├── seed.py             # Resets the database and adds sample data
+    ├── routes/
+    │   ├── __init__.py     # Registers the blueprints
+    │   ├── workouts.py     # /workouts endpoints
+    │   └── exercises.py    # /exercises endpoints
+    └── migrations/         # Alembic migration files
 ```
 
 ---
 
 ## Data Models
 
-### Exercise
-| Column | Type | Notes |
-|---|---|---|
-| id | Integer | Primary key |
-| name | String | Required, unique |
-| category | String | Required |
-| equipment_needed | Boolean | Required, default `False` |
+**Exercise**: `id`, `name` (string), `category` (string), `equipment_needed` (boolean)
 
-### Workout
-| Column | Type | Notes |
-|---|---|---|
-| id | Integer | Primary key |
-| date | Date | Required |
-| duration_minutes | Integer | Required, > 0 |
-| notes | Text | Optional |
+**Workout**: `id`, `date` (date), `duration_minutes` (integer), `notes` (text)
 
-### WorkoutExercise (join table)
-| Column | Type | Notes |
-|---|---|---|
-| id | Integer | Primary key |
-| workout_id | Integer | FK → `workouts.id` |
-| exercise_id | Integer | FK → `exercises.id` |
-| reps | Integer | Optional, ≥ 0 |
-| sets | Integer | Optional, ≥ 0 |
-| duration_seconds | Integer | Optional, ≥ 0 |
+**WorkoutExercise** (join table): `id`, `workout_id` → workouts, `exercise_id` → exercises, `reps`, `sets`, `duration_seconds` (integers)
 
 ### Relationships
-- A `WorkoutExercise` **belongs to** a `Workout`
-- A `WorkoutExercise` **belongs to** an `Exercise`
-- A `Workout` **has many** `WorkoutExercises`
-- An `Exercise` **has many** `WorkoutExercises`
-- A `Workout` **has many** `Exercises` **through** `WorkoutExercises`
-- An `Exercise` **has many** `Workouts` **through** `WorkoutExercises`
-
-Use `cascade="all, delete-orphan"` on the `workout_exercises` relationships so that deleting a workout or exercise also deletes its join rows (stretch goal).
+- A WorkoutExercise belongs to a Workout and to an Exercise.
+- A Workout has many WorkoutExercises, and has many Exercises through them (`workout.exercises`).
+- An Exercise has many WorkoutExercises, and has many Workouts through them (`exercise.workouts`).
+- Deleting a Workout or an Exercise also deletes its WorkoutExercise rows (`cascade="all, delete-orphan"`).
 
 ---
 
 ## Validations
 
-You need **at least 2 of each** type.
-
-### Table constraints (`models.py`, `__table_args__` / column args)
-- [ ] `nullable=False` on required columns (`Exercise.name`, `Exercise.category`, `Workout.date`, `Workout.duration_minutes`)
-- [ ] `unique=True` on `Exercise.name`
-- [ ] `CheckConstraint('duration_minutes > 0')` on `Workout`
-- [ ] `CheckConstraint('reps >= 0')`, `CheckConstraint('sets >= 0')`, `CheckConstraint('duration_seconds >= 0')` on `WorkoutExercise`
+### Table constraints (`models.py`)
+- `NOT NULL` on `Exercise.name`, `Exercise.category`, `Exercise.equipment_needed`, `Workout.date`, `Workout.duration_minutes` and both foreign keys
+- `UNIQUE` on `Exercise.name`
+- `UNIQUE (workout_id, exercise_id)`: an exercise appears at most once per workout
+- `CHECK` that the exercise name is not blank
+- `CHECK duration_minutes > 0`
+- `CHECK` that `reps`, `sets` and `duration_seconds` are not negative
 
 ### Model validations (`@validates` in `models.py`)
-- [ ] `Exercise.name` must be a non-empty string
-- [ ] `Exercise.category` must be in an allowed list (e.g. `strength`, `cardio`, `flexibility`, `balance`)
-- [ ] `Workout.duration_minutes` must be a positive integer
-- [ ] `WorkoutExercise` reps, sets and duration_seconds must not be negative
+- `Exercise.name` must be a non-empty string (surrounding spaces are removed)
+- `Exercise.category` must be one of `strength`, `cardio`, `flexibility`, `balance`
+- `Workout.date` must be a `date` object
+- `Workout.duration_minutes` must be a positive integer
+- `WorkoutExercise` reps, sets and duration_seconds must be non-negative integers
 
-### Schema validations (Marshmallow, `schemas.py`)
-- [ ] `fields.String(required=True, validate=validate.Length(min=1))` for `name`
-- [ ] `validate.OneOf([...])` for `category`
-- [ ] `fields.Integer(required=True, validate=validate.Range(min=1))` for `duration_minutes`
-- [ ] `validate.Range(min=0)` for reps, sets and duration_seconds
-- [ ] `@validates_schema`: a WorkoutExercise must have either reps/sets **or** duration_seconds
+### Schema validations (`schemas.py`)
+- Exercise `name`: required, 1–100 characters, not only spaces
+- Exercise `category`: required, must be one of the allowed categories
+- Workout `date`: required, valid `YYYY-MM-DD` date
+- Workout `duration_minutes`: required integer between 1 and 600
+- Workout `notes`: at most 1000 characters
+- WorkoutExercise `reps`, `sets`, `duration_seconds`: integers ≥ 0
+- WorkoutExercise: must include at least one of reps, sets or duration_seconds
 
 ---
 
 ## API Endpoints
 
-| Method | Route | Description |
-|---|---|---|
-| GET | `/workouts` | List all workouts |
-| GET | `/workouts/<id>` | Show one workout with its exercises (stretch goal: include reps/sets/duration) |
-| POST | `/workouts` | Create a workout |
-| DELETE | `/workouts/<id>` | Delete a workout (stretch goal: delete its WorkoutExercises) |
-| GET | `/exercises` | List all exercises |
-| GET | `/exercises/<id>` | Show one exercise with its workouts |
-| POST | `/exercises` | Create an exercise |
-| DELETE | `/exercises/<id>` | Delete an exercise (stretch goal: delete its WorkoutExercises) |
-| POST | `/workouts/<workout_id>/exercises/<exercise_id>/workout_exercises` | Add an exercise to a workout with reps/sets/duration |
+| Method | Route | Description | Success |
+|---|---|---|---|
+| GET | `/workouts` | List all workouts | 200 |
+| GET | `/workouts/<id>` | One workout with its exercises and their reps/sets/duration | 200 |
+| POST | `/workouts` | Create a workout | 201 |
+| DELETE | `/workouts/<id>` | Delete a workout and its WorkoutExercises | 204 |
+| GET | `/exercises` | List all exercises | 200 |
+| GET | `/exercises/<id>` | One exercise with the workouts it is used in | 200 |
+| POST | `/exercises` | Create an exercise | 201 |
+| DELETE | `/exercises/<id>` | Delete an exercise and its WorkoutExercises | 204 |
+| POST | `/workouts/<workout_id>/exercises/<exercise_id>/workout_exercises` | Add an exercise to a workout | 201 |
 
-> No update (PATCH/PUT) endpoints are required, and removing an exercise from a workout is not required.
+### Errors
+All errors are returned as JSON with an `errors` key:
+- **400**: schema or model validation failed, for example `{"errors": {"duration_minutes": ["Must be greater than or equal to 1 and less than or equal to 600."]}}`
+- **404**: the workout or exercise does not exist
+- **409**: a database constraint failed, such as a duplicate exercise name or adding the same exercise to a workout twice
 
 ### Example requests
 
-**POST /exercises**
+```bash
+# Create an exercise
+curl -X POST localhost:5555/exercises -H "Content-Type: application/json" \
+  -d '{"name": "Burpee", "category": "cardio", "equipment_needed": false}'
+
+# Create a workout
+curl -X POST localhost:5555/workouts -H "Content-Type: application/json" \
+  -d '{"date": "2026-11-04", "duration_minutes": 50, "notes": "Push day"}'
+
+# Add the exercise to the workout
+curl -X POST localhost:5555/workouts/4/exercises/6/workout_exercises \
+  -H "Content-Type: application/json" -d '{"sets": 3, "reps": 12}'
+
+# View the workout with its exercises
+curl localhost:5555/workouts/4
+```
+
+Example response from `GET /workouts/1`:
+
 ```json
-{ "name": "Push Up", "category": "strength", "equipment_needed": false }
+{
+  "id": 1,
+  "date": "2026-11-01",
+  "duration_minutes": 45,
+  "notes": "Upper body and core.",
+  "workout_exercises": [
+    {
+      "id": 1, "workout_id": 1, "exercise_id": 1,
+      "sets": 4, "reps": 15, "duration_seconds": null,
+      "exercise": {"id": 1, "name": "Push Up", "category": "strength", "equipment_needed": false}
+    }
+  ]
+}
 ```
-
-**POST /workouts**
-```json
-{ "date": "2026-11-03", "duration_minutes": 45, "notes": "Upper body day" }
-```
-
-**POST /workouts/1/exercises/2/workout_exercises**
-```json
-{ "reps": 12, "sets": 3, "duration_seconds": 0 }
-```
-
-### Response codes
-- `200` OK for successful GET
-- `201` Created for successful POST
-- `204` No Content (or `200` with a message) for successful DELETE
-- `400` / `422` for validation errors (return the Marshmallow error messages)
-- `404` when a workout or exercise is not found
-
----
-
-## Starter Code
-
-**server/app.py**
-```python
-from flask import Flask, make_response
-from flask_migrate import Migrate
-
-from models import *
-
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-migrate = Migrate(app, db)
-
-db.init_app(app)
-
-# Define Routes here
-
-if __name__ == '__main__':
-    app.run(port=5555, debug=True)
-```
-
-**server/models.py**
-```python
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import validates
-db = SQLAlchemy()
-
-# Define Models here
-```
-
-**server/seed.py**
-```python
-#!/usr/bin/env python3
-
-from app import app
-from models import *
-
-with app.app_context():
-
-    # reset data and add new example data, committing to db
-```
-
----
-
-## Work Plan & Commit Checklist
-
-Commit after each step with a clear message.
-
-- [ ] **Step 1: Setup.** Create the GitHub repo with README and Python `.gitignore`, add the Pipfile, install packages, and create `server/app.py`, `models.py` and `seed.py`.
-  *Commit: "Set up project structure and dependencies"*
-- [ ] **Step 2: Models.** Add `Exercise`, `Workout` and `WorkoutExercise`, committing after each model.
-- [ ] **Step 3: Relationships.** Add the belongs-to, has-many and has-many-through relationships (`relationship`, `back_populates`, `association_proxy`).
-- [ ] **Step 4: Constraints & model validations.** Add at least 2 table constraints and at least 2 `@validates`.
-- [ ] **Step 5: Migrate.** Run `flask db init`, then `flask db migrate -m "..."`, then `flask db upgrade head`.
-- [ ] **Step 6: Seed.** Clear the tables, add a few records to each table, run `seed.py`, and check the data in `flask shell`.
-- [ ] **Step 7: Scaffold endpoints.** Add a stub for every route.
-- [ ] **Step 8: Schemas.** Add a Marshmallow schema for each model (with nested relationships).
-- [ ] **Step 9: Schema validations.** Add at least 2.
-- [ ] **Step 10: Finish the endpoints.** Use the schemas to serialize and deserialize in every route, committing after each endpoint.
