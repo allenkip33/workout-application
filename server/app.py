@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_migrate import Migrate
 
+from errors import register_error_handlers
 from models import db
 from routes import register_routes
 
@@ -15,6 +16,7 @@ migrate = Migrate(app, db)
 db.init_app(app)
 
 register_routes(app)
+register_error_handlers(app)
 
 if __name__ == '__main__':
     app.run(port=5555, debug=True)
